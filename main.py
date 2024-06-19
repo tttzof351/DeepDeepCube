@@ -256,7 +256,7 @@ def test_cpp():
             "solution": result.actions,
             "h_values": [np.round(h, 3) for h in result.h_values],
             "visit_nodes": result.visit_nodes,
-            "duration": duration
+            "duration_sec": duration
         }
         print(rec)
         records.append(rec)
