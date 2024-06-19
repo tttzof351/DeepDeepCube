@@ -105,7 +105,7 @@ class Node {
     public:
 
     int space_size = -1;
-    vector<float>* state = nullptr;
+    vector<float>* state = nullptr; //TODO: Move to stack
     uint64_t state_hash = -1;
 
     Node* parent = nullptr;

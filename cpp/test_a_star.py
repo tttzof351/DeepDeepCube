@@ -18,20 +18,14 @@ with open("../assets/tests/test_states.pickle", "rb") as f:
 with open("../assets/tests/test_distance.pickle", "rb") as f:
     test_distance = pkl.load(f)
 
-print("actions:", actions.shape)
-print("actions[0]:", actions[0])
-
 a_star.init_wyhash()
 a_star.set_cube3_actions(actions)
-a_star.run_openmp_test()
+# a_star.run_openmp_test()
 
-for t in range(len(test_distance)):
-    if test_distance[t] < 1:
-        continue
-    
-    print("Distance: ", test_distance[t])
-    a_star.search_a(
-        test_states[t], # state
-        10_000_000, # limit size
-        True # debug
-    )
+t = 200
+print("Distance: ", test_distance[t])
+a_star.search_a(
+    test_states[t], # state
+    10_000_000, # limit size
+    True # debug
+)
