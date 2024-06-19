@@ -18,11 +18,11 @@ with open("../assets/tests/test_states.pickle", "rb") as f:
 with open("../assets/tests/test_distance.pickle", "rb") as f:
     test_distance = pkl.load(f)
 
-a_star.init_wyhash()
-a_star.set_cube3_actions(actions)
-a_star.run_openmp_test()
+# a_star.run_openmp_test()
 
-t = 400
+a_star.init_envs(actions)
+
+t = 0
 print("Distance: ", test_distance[t])
 result = a_star.search_a(
     test_states[t], # state

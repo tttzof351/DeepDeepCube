@@ -13,352 +13,29 @@
 #include <pybind11/stl.h>
 
 #include "../../assets/models/catboost_cube3.cpp"
+
 #include "utils.h"
-#include "wyhash.h"
+#include "cube3_game.h"
+#include "a_star.h"
 
 using namespace std;
-
 namespace py = pybind11;
-
-/* ===== HASH ========= */
-int seed = 42;
-uint64_t _wyp_s[4];
-
-uint64_t w_hash(const void *data, size_t len) {
-    return wyhash(data, len, seed, _wyp_s);
-}
-
-class Cube3Game {
-    public:
-    
-    int space_size = -1;
-    int action_size = -1;
-    int* actions = nullptr;
-    bool debug = true;
-
-    Cube3Game() {    
-        ;
-    }
-
-    ~Cube3Game() {
-        if (actions != nullptr) {
-            delete[] actions;
-            actions = nullptr;
-        }
-    }
-
-    void set_actions(
-        int action_size, // Must be 18
-        int space_size, // Must be 54
-        double* external_actions
-    ) {
-        if (debug) {
-            cout << "set_actions; action_size: " << action_size << "; space_size: " << space_size << endl;
-        }
-
-        this->space_size = space_size;
-        this->action_size = action_size;
-
-        this->actions = new int[action_size * space_size];
-        
-        #pragma omp simd
-        for (int i = 0; i < action_size * space_size; i++) {
-            this->actions[i] = int(external_actions[i]);
-        }
-
-        // if (debug) {
-        //     cout << "action[0] in c++: ";
-        //     for (int i = 0; i < this->space_size; i++) {
-        //         cout << this->actions[i] << " ";
-        //     }
-        //     cout << endl;
-        // }
-    }
-
-    bool is_goal_by_state(vector<float>& state) {
-        bool answer = true;
-        #pragma omp simd        
-        for (int i = 0; i < this->space_size; i++) {
-            if (int(state[i]) != i) {
-                answer = false;
-            }            
-        }
-        return answer;
-    }
-
-    void apply_action(
-        vector<float>& in_state,
-        vector<float>& out_state,
-        int action
-    ) {
-        #pragma omp simd
-        for (int i = 0; i < this->space_size; i++) {
-            out_state[i] = int(in_state[
-                int(this->actions[action * this->space_size + i])
-            ]);
-            // out_state[i] = this->space_size - i;
-        }
-    }
-};
-
-
-class Node {
-    public:
-
-    int space_size = -1;
-    vector<float>* state = nullptr; //TODO: Move to stack
-    uint64_t state_hash = -1;
-
-    float g = 0;
-    float h = 0;
-    float f = 0;
-
-    Node* parent = nullptr;
-    int action = -1;
-
-    Node(
-        int space_size
-    ) {
-        this->space_size = space_size;
-        this->state = new vector<float>(space_size);
-    }
-
-    ~Node() {
-        if (this->state != nullptr) {
-            delete this->state;
-            this->state = nullptr;
-        }
-    }
-
-    void reset_hash() {
-        this->state_hash = w_hash(
-            (void*)&this->state->at(0), 
-            this->space_size * sizeof(float)
-        );
-    }
-
-    void reset_f() {
-        this->f = this->h + this->g;
-    }
-
-    vector<Node*> get_path() {
-        Node* node = this;
-        vector<Node*> path;
-
-        while (node != nullptr) {
-            path.push_back(node); // TODO: push_front ? 
-            node = node->parent;
-        }
-        std::reverse(path.begin(), path.end());
-
-        return move(path);
-    }
-};
-
-struct CompareNode {
-    bool operator()(const Node* n1, const Node* n2) {
-        return n1->f > n2->f;
-    }
-};
-
-class NodeQueue {
-    public:
-
-    std::priority_queue <Node*, vector<Node*>, CompareNode> queue;
-    std::map<uint64_t, Node*> hashes;
-
-    NodeQueue() {
-        ;
-    }
-
-    ~NodeQueue() {
-        ;
-    }
-
-    void insert(Node* node) {
-        this->queue.push(node);
-        this->hashes[node->state_hash] = node;
-    }
-
-    Node* pop_min_element() {
-        Node* node = this->queue.top();
-        this->queue.pop();
-
-        this->hashes.erase(node->state_hash);
-
-        return node;
-    }
-
-    int size() {
-        return this->queue.size();
-    }
-
-    bool is_contains(Node* node) {
-        return this->hashes.find(node->state_hash) != this->hashes.end();
-    }
-};
-
-class AStar {
-    public:
-    
-    int limit_size = -1;
-    bool debug = false;    
-    NodeQueue open;
-    NodeQueue close;
-
-    AStar(
-        Cube3Game& game,
-        int limit_size,
-        double* init_state_raw,
-        bool debug
-    ) {
-        this->limit_size = limit_size;
-        this->debug = debug;
-
-        Node* root_node = new Node(game.space_size);
-        
-        //TODO: Memcopy
-        for (int i = 0; i < game.space_size; i++) {
-            root_node->state->at(i) = int(init_state_raw[i]);
-        }
-        
-        root_node->h = ApplyCatboostModel(*root_node->state);
-        root_node->reset_hash();
-        root_node->reset_f();
-
-        this->open.insert(root_node);
-    }
-
-    ~AStar() {        
-        while (open.size() > 0) {            
-            delete open.pop_min_element();
-        }
-
-        while (close.size() > 0) {
-            delete close.pop_min_element();
-        }
-    }
-
-    Node* search(Cube3Game& game) {
-        if (this->debug) {
-            cout << "search, size open: " << this->open.size() << endl;
-        }
-        
-        Node* child_nodes[game.action_size];
-        int global_i = 0;
-
-        auto start = std::chrono::high_resolution_clock::now();
-        
-        while (this->open.size() > 0) {
-            Node* best_node = this->open.pop_min_element();
-
-            //Initialization childs
-            #pragma omp parallel for
-            for (int action = 0; action < game.action_size; action++) {
-                Node* child = new Node(game.space_size);
-                child->action = action;
-
-                game.apply_action(
-                    *(best_node->state), // in
-                    *(child->state), // out
-                    action
-                );
-
-                child->h = ApplyCatboostModel(*(child->state));
-                child->g = best_node->g + 1;
-
-                child->parent = best_node;                
-                child->reset_hash();
-                child->reset_f();
-
-                child_nodes[action] = child;
-            }
-
-            for (int action = 0; action < game.action_size; action++) {
-                Node* child = child_nodes[action];
-                bool is_goal = game.is_goal_by_state(*(child->state));
-
-                if (is_goal) {
-                    //For prevent memory leak
-                    for (int j = action; j < game.action_size; j++) {
-                        delete child_nodes[j];
-                    }
-
-                    return child; 
-                                
-                } else if (this->close.is_contains(child)) {
-                    delete child;
-                    continue;
-                } else if (this->open.is_contains(child)) {
-                    //TODO: Need implementation
-                    delete child;
-
-                    continue;
-                } else {
-                    this->open.insert(child);
-                }
-            }
-
-            this->close.insert(best_node);            
-            
-            global_i += 1;
-            if (debug && global_i % 1000 == 0) {
-                auto end = std::chrono::high_resolution_clock::now();
-                
-                cout << "size open: " 
-                << this->close.size() 
-                << "; Duration: " 
-                << std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count()  
-                << " ms"
-                << endl; 
-
-                start = end;
-            }
-
-            if (global_i > this->limit_size) {
-                return nullptr;
-            }
-        }
-
-        return nullptr;
-    }
-};
 
 struct ResultSearch {
     vector<int> actions;
     vector<float> h_values;
-    int visit_nodes;
+    int visit_nodes = 0;
 };
 
 /* ============= Global variables ============= */
 
 Cube3Game game = Cube3Game();
 
-void set_cube3_actions(py::array_t<double> actions) {
-    cout << "c++ call set_cube3_actions" << endl;
-    py::buffer_info action_info = actions.request();
-    game.set_actions(
-        action_info.shape[0], //18
-        action_info.shape[1], //54
-        (double*) action_info.ptr
-    );
-    cout << "c++ end set_cube3_actions" << endl;
-}
-
-void init_wyhash() {
-    cout << "c++ call init_wyhash" << endl;
-    make_secret(time(NULL), _wyp_s);
-    cout << "c++ end init_wyhash" << endl;
-}
-
-int add_function(int i, int j) {
-    return i + j;
-}
+/* ============================================ */
 
 void run_openmp_test() {
     auto start = std::chrono::high_resolution_clock::now();    
     
-    // #pragma omp parallel 
     {
         #pragma omp parallel for 
         for (int i = 0; i < 5; i++) {
@@ -373,12 +50,25 @@ void run_openmp_test() {
     << std::endl << std::endl;
 }
 
-ResultSearch search_a(py::array_t<double> state, int limit_size, bool debug) {
-    if (debug) {
-        cout << "Start search!" << endl;
-    }
+void init_envs(py::array_t<double> actions) {    
+    init_wyhash();
 
+    py::buffer_info action_info = actions.request();
+    game.set_actions(
+        action_info.shape[0], //18
+        action_info.shape[1], //54
+        (double*) action_info.ptr
+    );    
+}
+
+ResultSearch search_a(py::array_t<double> state, int limit_size, bool debug) {
     py::buffer_info state_info = state.request();
+    ResultSearch result;
+
+    if (game.is_goal((double*) state_info.ptr)) {
+        return result;
+    }
+    
     AStar astar = AStar(
         game,
         limit_size,
@@ -387,12 +77,11 @@ ResultSearch search_a(py::array_t<double> state, int limit_size, bool debug) {
     );
 
     Node* target = astar.search(game);
-    ResultSearch result;
     result.visit_nodes = astar.close.size();
 
     if (target == nullptr) {
         return result;
-    } else {
+    } else if (debug) {
         cout << "Found!" << endl;
     }
 
@@ -402,34 +91,15 @@ ResultSearch search_a(py::array_t<double> state, int limit_size, bool debug) {
         Node* n = path[i];
         result.actions.push_back(n->action);
         result.h_values.push_back(n->h);
-    }    
-
-    // cout << "Path: [";
-    // for (int i = 0; i < path.size(); i++) {
-    //     Node* n = path[i];
-
-    //     cout << n->action << ", ";
-    // }
-    // cout << "]" << endl;
-
-    // cout << "Path h: [";
-    // for (int i = 0; i < path.size(); i++) {
-    //     Node* n = path[i];
-
-    //     cout << n->h << ", ";
-    // }
-    // cout << "]" << endl; 
+    }
 
     return result;   
 }
 
 PYBIND11_MODULE(a_star, m) { 
-    m.doc() = "a_star module"; // optional module docstring
-
-    m.def("add_function", &add_function, "add_function");
+    m.doc() = "a_star module"; 
     
-    m.def("set_cube3_actions", &set_cube3_actions, "set_cube3_actions");
-    m.def("init_wyhash", &init_wyhash, "init_wyhash");
+    m.def("init_envs", &init_envs, "init_envs");
     m.def("run_openmp_test", &run_openmp_test, "run_openmp_test");
 
     py::class_<ResultSearch>(m, "ResultSearch")
