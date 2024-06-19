@@ -22,7 +22,7 @@ with open("../assets/tests/test_distance.pickle", "rb") as f:
 
 cpp_a_star.init_envs(actions)
 
-t = 800
+t = 608
 print("Distance: ", test_distance[t])
 result = cpp_a_star.search_a(
     test_states[t], # state

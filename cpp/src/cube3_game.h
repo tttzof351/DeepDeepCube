@@ -39,7 +39,7 @@ class Cube3Game {
 
         this->actions = new int[action_size * space_size];
         
-        #pragma omp simd
+        // #pragma omp simd
         for (int i = 0; i < action_size * space_size; i++) {
             this->actions[i] = int(external_actions[i]);
         }
@@ -54,14 +54,12 @@ class Cube3Game {
     }
 
     bool is_goal(std::vector<float>& state) {
-        bool answer = true;
-        #pragma omp simd        
         for (int i = 0; i < this->space_size; i++) {
             if (int(state[i]) != i) {
-                answer = false;
+                return false;
             }            
         }
-        return answer;
+        return true;
     }
 
     bool is_goal(double* raw_input) {
@@ -79,7 +77,6 @@ class Cube3Game {
         std::vector<float>& out_state,
         int action
     ) {
-        #pragma omp simd
         for (int i = 0; i < this->space_size; i++) {
             out_state[i] = int(in_state[
                 int(this->actions[action * this->space_size + i])

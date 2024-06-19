@@ -183,7 +183,7 @@ class AStar {
                 if (is_goal) {
                     //For prevent memory leak
                     for (int j = action; j < game.action_size; j++) {
-                        delete child_nodes[j];
+                        this->open.insert(child_nodes[j]);
                     }
 
                     return child; 

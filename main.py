@@ -232,8 +232,9 @@ def test_cpp():
 
     cpp_a_star.init_envs(actions)
 
-    records = []
-    for i in range(len(test_distance)):
+    # records = []
+    records = pd.read_pickle("../assets/reports/cpp_reports.pkl").to_dict("records")
+    for i in range(records[-1]["i"], len(test_distance)):
         start = time.time()
 
         state = test_states[i]
