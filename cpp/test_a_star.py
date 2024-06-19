@@ -20,9 +20,9 @@ with open("../assets/tests/test_distance.pickle", "rb") as f:
 
 a_star.init_wyhash()
 a_star.set_cube3_actions(actions)
-# a_star.run_openmp_test()
+a_star.run_openmp_test()
 
-t = 200
+t = 800
 print("Distance: ", test_distance[t])
 a_star.search_a(
     test_states[t], # state

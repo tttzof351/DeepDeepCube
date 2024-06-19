@@ -15,4 +15,3 @@ cmake .. -DCMAKE_TOOLCHAIN_FILE=./build/Release/generators/conan_toolchain.cmake
 cmake --build .
 cd ..
 python test_a_star.py
-# ./a_star
