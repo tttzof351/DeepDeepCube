@@ -21,16 +21,17 @@ with open("../assets/tests/test_distance.pickle", "rb") as f:
 print("actions:", actions.shape)
 print("actions[0]:", actions[0])
 
-t = 800
-print(f"state[{t}]:", test_states[t])
-
 a_star.init_wyhash()
 a_star.set_cube3_actions(actions)
 a_star.run_openmp_test()
 
-print("Distance: ", test_distance[t])
-a_star.search_a(
-    test_states[t], # state
-    10_000_000, # limit size
-    True # debug
-)
+for t in range(len(test_distance)):
+    if test_distance[t] < 1:
+        continue
+    
+    print("Distance: ", test_distance[t])
+    a_star.search_a(
+        test_states[t], # state
+        10_000_000, # limit size
+        True # debug
+    )

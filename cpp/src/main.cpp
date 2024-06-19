@@ -83,7 +83,7 @@ class Cube3Game {
             }            
         }
         return answer;
-    }    
+    }
 
     void apply_action(
         vector<float>& in_state,
