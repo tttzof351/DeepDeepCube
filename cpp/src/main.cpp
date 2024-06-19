@@ -10,6 +10,7 @@
 
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
+#include <pybind11/stl.h>
 
 #include "../../assets/models/catboost_cube3.cpp"
 #include "utils.h"
@@ -108,11 +109,12 @@ class Node {
     vector<float>* state = nullptr; //TODO: Move to stack
     uint64_t state_hash = -1;
 
-    Node* parent = nullptr;
+    float g = 0;
+    float h = 0;
+    float f = 0;
 
-    int g = 0;
-    int h = 0;
-    int f = 0;
+    Node* parent = nullptr;
+    int action = -1;
 
     Node(
         int space_size
@@ -137,6 +139,19 @@ class Node {
 
     void reset_f() {
         this->f = this->h + this->g;
+    }
+
+    vector<Node*> get_path() {
+        Node* node = this;
+        vector<Node*> path;
+
+        while (node != nullptr) {
+            path.push_back(node); // TODO: push_front ? 
+            node = node->parent;
+        }
+        std::reverse(path.begin(), path.end());
+
+        return move(path);
     }
 };
 
@@ -233,6 +248,7 @@ class AStar {
         int global_i = 0;
 
         auto start = std::chrono::high_resolution_clock::now();
+        
         while (this->open.size() > 0) {
             Node* best_node = this->open.pop_min_element();
 
@@ -240,6 +256,7 @@ class AStar {
             #pragma omp parallel for
             for (int action = 0; action < game.action_size; action++) {
                 Node* child = new Node(game.space_size);
+                child->action = action;
 
                 game.apply_action(
                     *(best_node->state), // in
@@ -267,9 +284,6 @@ class AStar {
                         delete child_nodes[j];
                     }
 
-                    if (debug) {
-                        cout << "Found! " << endl;
-                    }
                     return child; 
                                 
                 } else if (this->close.is_contains(child)) {
@@ -301,13 +315,19 @@ class AStar {
                 start = end;
             }
 
-            // if (global_i > 0) {
-            //     break;s
-            // }
+            if (global_i > this->limit_size) {
+                return nullptr;
+            }
         }
 
         return nullptr;
     }
+};
+
+struct ResultSearch {
+    vector<int> actions;
+    vector<float> h_values;
+    int visit_nodes;
 };
 
 /* ============= Global variables ============= */
@@ -353,7 +373,7 @@ void run_openmp_test() {
     << std::endl << std::endl;
 }
 
-void search_a(py::array_t<double> state, int limit_size, bool debug) {
+ResultSearch search_a(py::array_t<double> state, int limit_size, bool debug) {
     if (debug) {
         cout << "Start search!" << endl;
     }
@@ -366,7 +386,41 @@ void search_a(py::array_t<double> state, int limit_size, bool debug) {
         debug
     );
 
-    astar.search(game);
+    Node* target = astar.search(game);
+    ResultSearch result;
+    result.visit_nodes = astar.close.size();
+
+    if (target == nullptr) {
+        return result;
+    } else {
+        cout << "Found!" << endl;
+    }
+
+    vector<Node*> path = target->get_path();
+
+    for (int i = 0; i < path.size(); i++) {
+        Node* n = path[i];
+        result.actions.push_back(n->action);
+        result.h_values.push_back(n->h);
+    }    
+
+    // cout << "Path: [";
+    // for (int i = 0; i < path.size(); i++) {
+    //     Node* n = path[i];
+
+    //     cout << n->action << ", ";
+    // }
+    // cout << "]" << endl;
+
+    // cout << "Path h: [";
+    // for (int i = 0; i < path.size(); i++) {
+    //     Node* n = path[i];
+
+    //     cout << n->h << ", ";
+    // }
+    // cout << "]" << endl; 
+
+    return result;   
 }
 
 PYBIND11_MODULE(a_star, m) { 
@@ -376,29 +430,13 @@ PYBIND11_MODULE(a_star, m) {
     
     m.def("set_cube3_actions", &set_cube3_actions, "set_cube3_actions");
     m.def("init_wyhash", &init_wyhash, "init_wyhash");
-    m.def("search_a", &search_a, "search_a");
     m.def("run_openmp_test", &run_openmp_test, "run_openmp_test");
+
+    py::class_<ResultSearch>(m, "ResultSearch")
+            .def(py::init<>())
+            .def_readwrite("actions", &ResultSearch::actions)
+            .def_readwrite("h_values", &ResultSearch::h_values)
+            .def_readwrite("visit_nodes", &ResultSearch::visit_nodes);
+
+    m.def("search_a", &search_a, "search_a");   
 }
-
-
-// int main() {
-//     auto start = std::chrono::high_resolution_clock::now();
-    
-//     #pragma omp parallel for
-//     for (int i = 0; i < 10'000; i++) {
-//         std::vector<float> floatFeatures(54);
-//         for (int j = 0; j < 54; j++) {
-//             floatFeatures[j] = j;
-//         }
-
-//         float predict = ApplyCatboostModel(floatFeatures);
-//     }
-    
-//     auto done = std::chrono::high_resolution_clock::now();
-//     std::cout << "Catboost 10K: "
-//     << std::chrono::duration_cast<std::chrono::milliseconds>(done-start).count() << " ms"
-//     << std::endl << std::endl;
-
-    
-//     return 0;
-// }

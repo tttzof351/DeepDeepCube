@@ -150,10 +150,10 @@ class Node:
         self.f = None
         
         self.parent = None
-        self.action = None
+        self.action = -1
         
     def reset_f(self):
-        self.f = self.h + 0.9 * self.g
+        self.f = self.h + self.g
         
     def get_path(self):
         node = self
@@ -246,17 +246,18 @@ class AStar:
                 child_node.reset_f()
                 
                 if game.is_goal(state=child_node.state, state_hash=child_node.state_hash):
-                    return child_node, len(self.close)
+                    return child_node
                 
                 if self.close.is_contains(child_node):                    
                     continue
                 elif self.open.is_contains(child_node):
-                    prev_child_node = self.open.hashes[child_node.state_hash]
-                    if prev_child_node.g > child_node.g:
-                        prev_child_node.g = child_node.g
-                        prev_child_node.parent = child_node.parent
-                        prev_child_node.action = child_node.action                        
-                        prev_child_node.reset_f()
+                    #TODO: Need implementation
+                    # prev_child_node = self.open.hashes[child_node.state_hash]
+                    # if prev_child_node.g > child_node.g:
+                    #     prev_child_node.g = child_node.g
+                    #     prev_child_node.parent = child_node.parent
+                    #     prev_child_node.action = child_node.action                        
+                    #     prev_child_node.reset_f()
 
                         # TODO: Need to return ?
                         # self.open.reset_q()
@@ -276,9 +277,9 @@ class AStar:
                 start = end
 
             if global_i > self.limit_size:
-                return None, len(self.close)
+                return None
         
-        return None, len(self.close)
+        return None
 
 
 def test_catboost():
@@ -298,7 +299,7 @@ def test_catboost():
 
     records = []
     for i in range(len(test_distances)):
-        if i != 800:
+        if i != 400:
             continue
 
         target_distance = test_distances[i]
@@ -314,7 +315,8 @@ def test_catboost():
                 verbose=True
             )
 
-            target_node, close_nodes = a_star.search(game)
+            target_node = a_star.search(game)
+            close_nodes = len(a_star.close)
             end = time.time()
             duration = np.round(end - start, 3)
             
@@ -363,7 +365,9 @@ def benchmank_a_star():
         limit_size=100_000,
         verbose=True
     )
-    target_node, close_nodes = a_star.search(game)
+    target_node = a_star.search(game)
+    close_nodes = len(a_star.close)
+
     end = time.time()
     duration = np.round(end - start, 3)
     
