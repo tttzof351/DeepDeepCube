@@ -59,6 +59,8 @@ class Cube3Game {
         this->action_size = action_size;
 
         this->actions = new int[action_size * space_size];
+        
+        #pragma omp simd
         for (int i = 0; i < action_size * space_size; i++) {
             this->actions[i] = int(external_actions[i]);
         }
@@ -73,12 +75,14 @@ class Cube3Game {
     }
 
     bool is_goal_by_state(vector<float>& state) {
+        bool answer = true;
+        #pragma omp simd        
         for (int i = 0; i < this->space_size; i++) {
             if (int(state[i]) != i) {
-                return false;
+                answer = false;
             }            
         }
-        return true;
+        return answer;
     }    
 
     void apply_action(
@@ -86,7 +90,7 @@ class Cube3Game {
         vector<float>& out_state,
         int action
     ) {
-        #pragma omp parallel for
+        #pragma omp simd
         for (int i = 0; i < this->space_size; i++) {
             out_state[i] = int(in_state[
                 int(this->actions[action * this->space_size + i])
@@ -253,7 +257,6 @@ class AStar {
                 child_nodes[action] = child;
             }
 
-            // #pragma omp parallel for
             for (int action = 0; action < game.action_size; action++) {
                 Node* child = child_nodes[action];
                 bool is_goal = game.is_goal_by_state(*(child->state));
@@ -267,7 +270,8 @@ class AStar {
                     if (debug) {
                         cout << "Found! " << endl;
                     }
-                    return child;
+                    return child; 
+                                
                 } else if (this->close.is_contains(child)) {
                     delete child;
                     continue;

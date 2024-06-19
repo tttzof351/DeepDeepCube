@@ -21,7 +21,7 @@ with open("../assets/tests/test_distance.pickle", "rb") as f:
 print("actions:", actions.shape)
 print("actions[0]:", actions[0])
 
-t = 700
+t = 800
 print(f"state[{t}]:", test_states[t])
 
 a_star.init_wyhash()
