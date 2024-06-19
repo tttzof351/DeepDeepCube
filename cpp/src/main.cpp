@@ -21,10 +21,10 @@ namespace py = pybind11;
 
 /* ===== HASH ========= */
 int seed = 42;
-uint64_t _wyp_secret[1];
+uint64_t _wyp_s[4];
 
 uint64_t w_hash(const void *data, size_t len) {
-    return wyhash(data, len, seed, &_wyp[0]);
+    return wyhash(data, len, seed, _wyp_s);
 }
 
 class Cube3Game {
@@ -177,7 +177,6 @@ class NodeQueue {
     bool is_contains(Node* node) {
         return this->hashes.find(node->state_hash) != this->hashes.end();
     }
-
 };
 
 class AStar {
@@ -211,6 +210,16 @@ class AStar {
         this->open.insert(root_node);
     }
 
+    ~AStar() {        
+        while (open.size() > 0) {            
+            delete open.pop_min_element();
+        }
+
+        while (close.size() > 0) {
+            delete close.pop_min_element();
+        }
+    }
+
     Node* search(Cube3Game& game) {
         if (this->debug) {
             cout << "search, size open: " << this->open.size() << endl;
@@ -224,6 +233,7 @@ class AStar {
             Node* best_node = this->open.pop_min_element();
 
             //Initialization childs
+            #pragma omp parallel for
             for (int action = 0; action < game.action_size; action++) {
                 Node* child = new Node(game.space_size);
 
@@ -243,21 +253,17 @@ class AStar {
                 child_nodes[action] = child;
             }
 
-            #pragma omp parallel for
+            // #pragma omp parallel for
             for (int action = 0; action < game.action_size; action++) {
                 Node* child = child_nodes[action];
                 bool is_goal = game.is_goal_by_state(*(child->state));
 
-                // if (debug) {
-                //     cout << "action:" << action << endl;
-                //     for (int j = 0; j < game.space_size; j++) {
-                //         cout << int(child->state->at(j)) << " ";
-                //     }
-                //     cout << endl << endl;
-                // }
-
                 if (is_goal) {
-                    //TODO: Memory leak
+                    //For prevent memory leak
+                    for (int j = action; j < game.action_size; j++) {
+                        delete child_nodes[j];
+                    }
+
                     if (debug) {
                         cout << "Found! " << endl;
                     }
@@ -267,6 +273,8 @@ class AStar {
                     continue;
                 } else if (this->open.is_contains(child)) {
                     //TODO: Need implementation
+                    delete child;
+
                     continue;
                 } else {
                     this->open.insert(child);
@@ -303,16 +311,20 @@ class AStar {
 Cube3Game game = Cube3Game();
 
 void set_cube3_actions(py::array_t<double> actions) {
+    cout << "c++ call set_cube3_actions" << endl;
     py::buffer_info action_info = actions.request();
     game.set_actions(
         action_info.shape[0], //18
         action_info.shape[1], //54
         (double*) action_info.ptr
     );
+    cout << "c++ end set_cube3_actions" << endl;
 }
 
 void init_wyhash() {
-    make_secret(seed, &_wyp_secret[0]);
+    cout << "c++ call init_wyhash" << endl;
+    make_secret(time(NULL), _wyp_s);
+    cout << "c++ end init_wyhash" << endl;
 }
 
 int add_function(int i, int j) {
@@ -320,13 +332,21 @@ int add_function(int i, int j) {
 }
 
 void run_openmp_test() {
-    int sum=3;
-    #pragma omp parallel shared(sum)
+    auto start = std::chrono::high_resolution_clock::now();    
+    
+    // #pragma omp parallel 
     {
-        sleep(3);
-        #pragma omp critical
-        sum += omp_get_thread_num();
+        #pragma omp parallel for 
+        for (int i = 0; i < 5; i++) {
+            sleep(3);  
+            std::cout << "Thread " << omp_get_thread_num() << " completed iteration " << i << std::endl;      
+        }
     }
+    
+    auto done = std::chrono::high_resolution_clock::now();
+    std::cout << "Run openmp test (without 15000 ms): "
+    << std::chrono::duration_cast<std::chrono::milliseconds>(done-start).count() << " ms"
+    << std::endl << std::endl;
 }
 
 void search_a(py::array_t<double> state, int limit_size, bool debug) {
