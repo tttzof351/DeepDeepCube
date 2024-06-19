@@ -4,7 +4,6 @@
 #include <map>
 #include <ctime>
 
-
 #include <omp.h>
 #include <unistd.h> // sleep() function
 
@@ -96,8 +95,8 @@ ResultSearch search_a(py::array_t<double> state, int limit_size, bool debug) {
     return result;   
 }
 
-PYBIND11_MODULE(a_star, m) { 
-    m.doc() = "a_star module"; 
+PYBIND11_MODULE(cpp_a_star, m) { 
+    m.doc() = "cpp_a_star module"; 
     
     m.def("init_envs", &init_envs, "init_envs");
     m.def("run_openmp_test", &run_openmp_test, "run_openmp_test");

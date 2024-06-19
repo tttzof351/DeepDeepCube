@@ -7,7 +7,7 @@ else()
     message(STATUS "Using default compilers because ${CMAKE_HOST_SYSTEM_NAME}")    
 endif()
 
-project(a_star CXX)
+project(cpp_a_star CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -21,16 +21,16 @@ else()
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
 endif()
 
-pybind11_add_module(a_star src/main.cpp)
+pybind11_add_module(cpp_a_star src/main.cpp)
 
 target_include_directories(
-    a_star 
+    cpp_a_star 
     PUBLIC 
     ${Python3_INCLUDE_DIRS}
 )
 
 target_link_libraries(
-    a_star PUBLIC 
+    cpp_a_star PUBLIC 
     ${Python3_LIBRARIES}
     OpenMP::OpenMP_CXX
     pybind11::module

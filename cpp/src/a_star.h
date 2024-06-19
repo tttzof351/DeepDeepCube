@@ -207,7 +207,7 @@ class AStar {
             if (debug && global_i % 1000 == 0) {
                 auto end = std::chrono::high_resolution_clock::now();
                 
-                cout << "size open: " 
+                cout << "size close: " 
                 << this->close.size() 
                 << "; Duration: " 
                 << std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count()  

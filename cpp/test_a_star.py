@@ -7,7 +7,7 @@ import pickle as pkl
 import time
 
 sys.path.append("./build")
-import a_star
+import cpp_a_star
 
 with open("../assets/envs/cube_3_3_3_actions.pickle", "rb") as f:
     actions = np.array(pkl.load(f))
@@ -20,15 +20,16 @@ with open("../assets/tests/test_distance.pickle", "rb") as f:
 
 # a_star.run_openmp_test()
 
-a_star.init_envs(actions)
+cpp_a_star.init_envs(actions)
 
-t = 0
+t = 800
 print("Distance: ", test_distance[t])
-result = a_star.search_a(
+result = cpp_a_star.search_a(
     test_states[t], # state
-    10_000_000, # limit size
+    5_000_000, # limit size
     True # debug
 )
+
 print("Result actions: ", result.actions)
 print("Result h_values: ", [np.round(h, 3) for h in result.h_values])
 print("Result visit_nodes: ", result.visit_nodes)
