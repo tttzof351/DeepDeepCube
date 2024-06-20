@@ -131,13 +131,13 @@ class AStar {
         this->open.insert(root_node);
     }
 
-    ~AStar() {        
-        while (open.size() > 0) {            
-            delete open.pop_min_element();
+    ~AStar() {
+        for (auto it = open.hashes.begin(); it != open.hashes.end(); it++) {
+            delete it->second;
         }
 
-        while (close.size() > 0) {
-            delete close.pop_min_element();
+        for (auto it = close.hashes.begin(); it != close.hashes.end(); it++) {
+            delete it->second;
         }
     }
 
@@ -182,8 +182,8 @@ class AStar {
 
                 if (is_goal) {
                     //For prevent memory leak
-                    for (int j = action; j < game.action_size; j++) {
-                        this->open.insert(child_nodes[j]);
+                    for (int j = action + 1; j < game.action_size; j++) {
+                        delete child_nodes[j];
                     }
 
                     return child; 

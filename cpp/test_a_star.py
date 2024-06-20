@@ -22,6 +22,10 @@ with open("../assets/tests/test_distance.pickle", "rb") as f:
 
 cpp_a_star.init_envs(actions)
 
+# print("Start alloc test")
+# cpp_a_star.test_allocation_dealocation()
+# print("End alloc test")
+
 t = 608
 print("Distance: ", test_distance[t])
 result = cpp_a_star.search_a(

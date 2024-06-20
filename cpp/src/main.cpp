@@ -95,6 +95,30 @@ ResultSearch search_a(py::array_t<double> state, int limit_size, bool debug) {
     return result;   
 }
 
+void test_allocation_dealocation() {
+    cout << "Start alloc in C++" << endl;
+    double mock_state[54];
+
+    AStar astar = AStar(
+        game,
+        100'000'000,
+        mock_state,
+        true
+    );
+    for (int i = 0; i < 10'000'000; i++) {
+        astar.open.insert(
+            new Node(54)
+        );
+        astar.close.insert(
+            new Node(54)
+        );
+        if (i % 10000 == 0) {
+            cout << "i: " << i << endl;
+        }
+    }
+    cout << "End alloc in C++" << endl;
+}
+
 PYBIND11_MODULE(cpp_a_star, m) { 
     m.doc() = "cpp_a_star module"; 
     
@@ -107,5 +131,7 @@ PYBIND11_MODULE(cpp_a_star, m) {
             .def_readwrite("h_values", &ResultSearch::h_values)
             .def_readwrite("visit_nodes", &ResultSearch::visit_nodes);
 
-    m.def("search_a", &search_a, "search_a");   
+    m.def("search_a", &search_a, "search_a"); 
+    
+    m.def("test_allocation_dealocation", &test_allocation_dealocation, "test_allocation_dealocation");
 }
