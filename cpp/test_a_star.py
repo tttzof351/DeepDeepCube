@@ -26,7 +26,7 @@ cpp_a_star.init_envs(actions)
 # cpp_a_star.test_allocation_dealocation()
 # print("End alloc test")
 
-t = 608
+t = 400
 print("Distance: ", test_distance[t])
 result = cpp_a_star.search_a(
     test_states[t], # state

@@ -234,7 +234,7 @@ def test_cpp():
 
     # records = []
     records = pd.read_pickle("./assets/reports/cpp_reports.pkl").to_dict("records")
-    for i in range(records[-1]["i"], len(test_distance)):
+    for i in range(records[-1]["i"]+1, len(test_distance)):
         start = time.time()
 
         state = test_states[i]
