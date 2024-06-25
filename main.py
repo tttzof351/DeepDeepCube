@@ -7,6 +7,7 @@ from tqdm import tqdm
 from catboost import CatBoostRegressor
 from sklearn.metrics import r2_score
 from sklearn.metrics import mean_squared_error
+from numba import njit
 
 import time
 
@@ -17,7 +18,8 @@ from a_star import AStar
 
 import argparse
 
-seed = 42
+# seed = 42, 43 using for test
+seed = 42 
 
 random.seed(seed)
 np.random.seed(seed)
@@ -73,7 +75,7 @@ def train_catboost():
     print("test_predictions", test_predictions[-500:-500+10])
 
     model.save_model(f"./assets/models/catboost_cube3.cb")
-    model.save_model(f"./assets/models/catboost_cube3.cpp", format="CPP")    
+    model.save_model(f"./assets/models/catboost_cube3.cpp", format="CPP")
 
 
 def test_catboost():
@@ -93,8 +95,8 @@ def test_catboost():
 
     records = []
     for i in range(len(test_distances)):
-        if i != 400:
-            continue
+        # if i != 400:
+        #     continue
 
         target_distance = test_distances[i]
         if target_distance > 0:
@@ -214,7 +216,11 @@ def test_cube_env():
 
     pass
 
-def test_cpp():
+def test_cpp(
+        path_test_states: str,
+        path_test_distance: str,
+        output_path: str
+):
     import os
     import sys
     sys.path.append("./assets/shared_libraries/macos")
@@ -224,17 +230,16 @@ def test_cpp():
     with open("./assets/envs/cube_3_3_3_actions.pickle", "rb") as f:
         actions = np.array(pkl.load(f))
 
-    with open("./assets/tests/test_states.pickle", "rb") as f:
+    with open(path_test_states, "rb") as f:
         test_states = pkl.load(f)
         
-    with open("./assets/tests/test_distance.pickle", "rb") as f:
+    with open(path_test_distance, "rb") as f:
         test_distance = pkl.load(f)
 
     cpp_a_star.init_envs(actions)
 
-    # records = []
-    records = pd.read_pickle("./assets/reports/cpp_reports.pkl").to_dict("records")
-    for i in range(records[-1]["i"]+1, len(test_distance)):
+    records = []
+    for i in range(0, len(test_distance)):
         start = time.time()
 
         state = test_states[i]
@@ -263,7 +268,29 @@ def test_cpp():
         records.append(rec)
 
         df = pd.DataFrame(records)
-        df.to_pickle("./assets/reports/cpp_reports.pkl")
+        df.to_pickle(output_path)
+
+def generate_test_1000():
+    seed = 43
+
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+
+    game = Cube3Game("./assets/envs/cube_3_3_3_actions.pickle")
+
+    test_states, test_distances = game.get_random_states(
+        n_states=20, 
+        min_distance=1000,
+        max_distance=1001
+    )
+
+    with open("./assets/tests/test_states_1000.pickle", "wb") as f:
+         pkl.dump(test_states, f)
+
+    with open("./assets/tests/test_distance_1000.pickle", "wb") as f:
+         pkl.dump(test_distances, f)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -281,4 +308,17 @@ if __name__ == "__main__":
     elif args.mode == "test_env":
         test_cube_env()
     elif args.mode == "test_cpp":
-        test_cpp()
+        test_cpp(
+            path_test_states = "./assets/tests/test_states.pickle",
+            path_test_distance = "./assets/tests/test_distance.pickle",
+            output_path = "./assets/reports/cpp_reports.pkl"
+        )
+    elif args.mode == "test_1000_cpp":
+        test_cpp(
+            path_test_states = "./assets/tests/test_states_1000.pickle",
+            path_test_distance = "./assets/tests/test_distance_1000.pickle",
+            output_path = "./assets/reports/cpp_reports_1000.pkl"
+        )
+    elif args.mode == "gen_test_1000":
+        generate_test_1000()
+

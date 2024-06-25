@@ -16,7 +16,8 @@ class Cube3Game:
     def get_random_states(
             self, 
             n_states=10, 
-            max_distance=30
+            min_distance=0,
+            max_distance=30,
         ):
             random_states = np.expand_dims(self.initial_state, axis=0)             
             random_states = np.repeat(
@@ -26,7 +27,7 @@ class Cube3Game:
             )
 
             num_random_disatnces = np.random.choice(
-                 a=max_distance,
+                 a=np.arange(min_distance, max_distance),
                  size=n_states
             )
             num_random_disatnces = np.sort(num_random_disatnces)            
@@ -38,7 +39,8 @@ class Cube3Game:
                     a=len(self.actions),
                     size=distance
                 )
-                for action in path:
+                for k, action in enumerate(path):
+                    # print(f"{i}-{k}): {action}")
                     state = self.apply_action(state=state, action=action)
                 
                 random_states[i, :] = state
