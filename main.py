@@ -77,7 +77,6 @@ def train_catboost():
     model.save_model(f"./assets/models/catboost_cube3.cb")
     model.save_model(f"./assets/models/catboost_cube3.cpp", format="CPP")
 
-
 def test_catboost():
     game = Cube3Game("./assets/envs/cube_3_3_3_actions.pickle")
 
@@ -290,7 +289,6 @@ def generate_test_1000():
 
     with open("./assets/tests/test_distance_1000.pickle", "wb") as f:
          pkl.dump(test_distances, f)
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
