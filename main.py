@@ -290,6 +290,124 @@ def generate_test_1000():
     with open("./assets/tests/test_distance_1000.pickle", "wb") as f:
          pkl.dump(test_distances, f)
 
+def metropolis_a_star_cpp(
+    path_test_states = "./assets/tests/test_states.pickle",
+    path_test_distance = "./assets/tests/test_distance.pickle",
+    output_path = "./assets/reports/metropolis_cpp_reports.pkl"        
+):
+    import os
+    import sys
+    sys.path.append("./assets/shared_libraries/macos")
+
+    import cpp_a_star
+
+    with open("./assets/envs/cube_3_3_3_actions.pickle", "rb") as f:
+        actions = np.array(pkl.load(f))
+
+    with open(path_test_states, "rb") as f:
+        test_states = pkl.load(f)
+        
+    with open(path_test_distance, "rb") as f:
+        test_distance = pkl.load(f)
+
+    cpp_a_star.init_envs(actions)
+
+    model = CatBoostRegressor()
+    model.load_model("./assets/models/catboost_cube3.cb")
+    game = Cube3Game("./assets/envs/cube_3_3_3_actions.pickle")
+
+    records = []
+    # for i in reversed(range(0, len(test_distance))):
+    for i in range(0, len(test_distance)):
+        start = time.time()
+
+        state = test_states[i]
+        target_distance = test_distance[i]
+
+        start_predict = model.predict(state)
+
+        if start_predict > 19:            
+            target_predict = 16
+            diff_predict = int(start_predict - target_predict)
+
+            start_path = np.random.choice(
+                a=len(game.actions),
+                size=diff_predict
+            )
+
+            print("start_predict:", start_predict)
+            print("diff predict:", diff_predict)
+            print("start_path:", start_path)
+
+            current_predict = start_predict
+            current_path = start_path
+            
+            metropolis_counter = 0
+            while current_predict > target_predict:
+                random_pos = np.random.randint(0, len(current_path))
+                random_action = np.random.randint(0, len(game.actions))
+
+                new_path = current_path.copy()
+                new_path[random_pos] = random_action
+
+                current_state = state.copy()    
+                for a in current_path:
+                    current_state = game.apply_action(state=current_state, action=a)
+
+                new_predict = model.predict(current_state)
+                epsilon = np.random.rand()
+                
+                if new_predict < current_predict or epsilon > 0.9:
+                    current_predict = new_predict
+                    current_path = new_path
+                    # print("Prediction:", new_predict)
+                
+                metropolis_counter += 1
+
+            current_state = state.copy()    
+            for a in current_path:
+                current_state = game.apply_action(state=current_state, action=a)
+
+            print("Distance: ", target_distance, "; Metropolis: ", metropolis_counter)
+            result = cpp_a_star.search_a(
+                current_state, # state
+                10_000_000, # limit size
+                True # debug
+            )
+            
+            if len(result.actions) > 0:
+                solution = [-1] + current_path.tolist() + result.actions[1:]
+            else:
+                solution = []
+
+        else:
+            result = cpp_a_star.search_a(
+                state, # state
+                10_000_000, # limit size
+                True # debug
+            )
+            solution = result.actions
+            metropolis_counter = 0
+        
+        end = time.time()
+        duration = np.round(end - start, 3)
+
+        rec = {
+            "i": i,
+            "state": state,
+            "target_distance": target_distance,
+            "solution": solution,
+            "h_values": [np.round(h, 3) for h in result.h_values],
+            "visit_nodes": result.visit_nodes,
+            "duration_sec": duration,
+            "metropolis_counter": metropolis_counter
+        }
+        print(rec)
+        records.append(rec)
+
+        df = pd.DataFrame(records)
+        df.to_pickle(output_path)
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--mode', type=str, default='test')
@@ -319,4 +437,15 @@ if __name__ == "__main__":
         )
     elif args.mode == "gen_test_1000":
         generate_test_1000()
-
+    elif args.mode == "metropolis_a_star_1000":
+        metropolis_a_star_cpp(
+            path_test_states = "./assets/tests/test_states_1000.pickle",
+            path_test_distance = "./assets/tests/test_distance_1000.pickle",
+            output_path = "./assets/reports/cpp_metropolis_reports_1000.pkl"
+        )
+    elif args.mode == "metropolis_a_star":
+        metropolis_a_star_cpp(
+            path_test_states = "./assets/tests/test_states.pickle",
+            path_test_distance = "./assets/tests/test_distance.pickle",
+            output_path = "./assets/reports/cpp_metropolis_reports.pkl"
+        )
