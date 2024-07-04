@@ -1,5 +1,6 @@
 import pickle as pkl
 import torch
+from accelerate import Accelerator
 import numpy as np
 import random
 from tqdm import tqdm
@@ -9,12 +10,16 @@ from sklearn.metrics import r2_score
 from sklearn.metrics import mean_squared_error
 from numba import njit
 
+from sklearn.metrics import root_mean_squared_error
+
 import time
 
 import pandas as pd
 
 from cube3_game import Cube3Game
 from a_star import AStar
+from dataset import Cube3Dataset
+from models import Cube3ResnetModel
 
 import argparse
 
@@ -44,6 +49,13 @@ def train_catboost():
         n_states=1000, 
         max_distance=max_distance
     )
+
+    with open("./assets/tests/val_states.pickle", "wb") as f:
+         pkl.dump(val_states, f)
+
+    with open("./assets/tests/val_distance.pickle", "wb") as f:
+         pkl.dump(val_distances, f)
+
     with open("./assets/tests/test_states.pickle", "wb") as f:
          pkl.dump(test_states, f)
 
@@ -408,6 +420,113 @@ def metropolis_a_star_cpp(
         df = pd.DataFrame(records)
         df.to_pickle(output_path)
 
+def train_resnet():
+    game = Cube3Game("./assets/envs/cube_3_3_3_actions.pickle")
+
+    with open("./assets/tests/val_states.pickle", "rb") as f:
+        val_states = pkl.load(f)
+
+    with open("./assets/tests/val_distance.pickle", "rb") as f:
+        val_distances = pkl.load(f)
+
+    val_dataset = torch.utils.data.TensorDataset(
+        torch.from_numpy(val_states), 
+        torch.from_numpy(val_distances.astype(np.float32))
+    )
+    val_dataloader = torch.utils.data.DataLoader(
+        val_dataset,
+        batch_size=128,
+        shuffle=False, 
+        num_workers=1
+    )
+    
+    training_dataset = Cube3Dataset(
+        game=game,
+        size=1_000_000
+    )
+    training_dataloader = torch.utils.data.DataLoader(
+        training_dataset, 
+        batch_size=128,
+        shuffle=True, 
+        num_workers=2
+    )
+    model = Cube3ResnetModel()
+    
+    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3)
+    accelerator = Accelerator()
+    device = accelerator.device    
+
+    model, optimizer, training_dataloader, val_dataloader = accelerator.prepare(
+        model, optimizer, training_dataloader, val_dataloader
+    )
+
+    mse_loss = torch.nn.MSELoss()
+
+    print("Accelerator device:", device)
+
+    global_i = 0
+    rmse_accum_loss = 0
+    print_count = 100
+    val_count = 1000
+    
+    best_val_score = float("inf")
+
+    while True:
+        for data in training_dataloader:
+            optimizer.zero_grad()
+            model.train()
+
+            states, targets = data
+
+            outputs = model(states)
+
+            loss = mse_loss(outputs, targets)
+            accelerator.backward(loss)
+            optimizer.step()
+
+            rmse_accum_loss += np.sqrt(loss.item())
+            global_i += 1
+            
+            if (global_i % print_count == 0):
+                av_rmse_accum_loss = np.round(rmse_accum_loss / print_count, 3)
+
+                print(f"{global_i}): train_rmse={av_rmse_accum_loss}")
+                rmse_accum_loss = 0.0
+
+            if (global_i % val_count == 0):
+                model.eval()
+
+                val_acc_rmse = 0
+                val_count_batch = 0               
+                with torch.no_grad():
+                    for val_data in val_dataloader:
+                        val_count_batch += 1
+                        val_states, val_targets = val_data
+                        val_targets = val_targets.unsqueeze(dim=1)
+
+                        # print("val_states:", val_states.shape)
+                        # print("val_targets:", val_targets.shape)
+                        val_outputs = model(val_states)
+                        # print("val_outputs:", val_outputs.shape)
+                        val_loss = mse_loss(val_outputs, val_targets)                        
+                        val_acc_rmse += np.sqrt(val_loss.item())
+
+                val_acc_rmse = np.round(val_acc_rmse / val_count_batch, 4)
+                print("==========================")
+                print(f"{global_i}): val_rmse={val_acc_rmse}")
+
+                if val_acc_rmse < best_val_score:
+                    torch.save(model.state_dict(), "./assets/models/Cube3ResnetModel.pt")
+                    best_val_score = val_acc_rmse
+                    print(f"Saved model!")
+                else:
+                    print(f"Old model is best! val_acc_rmse={val_acc_rmse} > best_val_score={best_val_score}")
+
+
+        #     break
+        # break
+        
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--mode', type=str, default='test')
@@ -415,13 +534,13 @@ if __name__ == "__main__":
 
     if args.mode == "test":
         test_catboost()
-    elif args.mode == "train":
+    elif args.mode == "train_catboost":
         train_catboost()
-    elif args.mode == "benchmark_a_star":
+    elif args.mode == "benchmank_a_star":
         benchmank_a_star()
     elif args.mode == "benchmark_catboost":
         benchmark_catboost()
-    elif args.mode == "test_env":
+    elif args.mode == "test_cube_env":
         test_cube_env()
     elif args.mode == "test_cpp":
         test_cpp(
@@ -449,3 +568,5 @@ if __name__ == "__main__":
             path_test_distance = "./assets/tests/test_distance.pickle",
             output_path = "./assets/reports/cpp_metropolis_reports.pkl"
         )
+    elif args.mode == "train_resnet":
+        train_resnet()
