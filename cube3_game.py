@@ -18,6 +18,7 @@ class Cube3Game:
             n_states=10, 
             min_distance=0,
             max_distance=30,
+            verbose=True
         ):
             random_states = np.expand_dims(self.initial_state, axis=0)             
             random_states = np.repeat(
@@ -32,7 +33,12 @@ class Cube3Game:
             )
             num_random_disatnces = np.sort(num_random_disatnces)            
 
-            for i in tqdm(range(n_states)):
+            if verbose:
+                iterations = tqdm(range(n_states))
+            else:
+                iterations = range(n_states)
+            
+            for i in iterations:
                 state = random_states[i, :]
                 distance = num_random_disatnces[i]
                 path = np.random.choice(
