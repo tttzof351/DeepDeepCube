@@ -16,6 +16,7 @@
 
 #include "heuristic_a_star.h"
 #include "catboost_a_star.h"
+#include "catboost_parallel_a_star.h"
 
 using namespace std;
 namespace py = pybind11;
@@ -140,6 +141,45 @@ ResultSearch catboost_search_a(
     return result;   
 }
 
+ResultSearch catboost_parallel_search_a(
+    py::array_t<double> state, 
+    int limit_size, 
+    bool debug
+) {
+    py::buffer_info state_info = state.request();
+    ResultSearch result;
+
+    if (game.is_goal((double*) state_info.ptr)) {
+        return result;
+    }
+    
+    CatboostParallelAStar astar = CatboostParallelAStar(        
+        game,
+        limit_size,
+        (double*) state_info.ptr,
+        debug
+    );
+
+    Node* target = astar.search(game);
+    result.visit_nodes = astar.close_size();
+
+    if (target == nullptr) {
+        return result;
+    } else if (debug) {
+        cout << "Found!" << endl;
+    }
+
+    vector<Node*> path = target->get_path();
+
+    for (int i = 0; i < path.size(); i++) {
+        Node* n = path[i];
+        result.actions.push_back(n->action);
+        result.h_values.push_back(n->h);
+    }
+
+    return result;   
+}
+
 
 PYBIND11_MODULE(cpp_a_star, m) { 
     m.doc() = "cpp_a_star module"; 
@@ -155,6 +195,7 @@ PYBIND11_MODULE(cpp_a_star, m) {
 
     m.def("heuristic_search_a", &heuristic_search_a, "heuristic_search_a"); 
     m.def("catboost_search_a", &catboost_search_a, "catboost_search_a"); 
+    m.def("catboost_parallel_search_a", &catboost_parallel_search_a, "catboost_parallel_search_a"); 
 
     
     // m.def("test_allocation_dealocation", &test_allocation_dealocation, "test_allocation_dealocation");

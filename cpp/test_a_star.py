@@ -78,9 +78,9 @@ if False:
     print("Result h_values: ", [np.round(h, 3) for h in result.h_values])
     print("Result visit_nodes: ", result.visit_nodes)
 
-print("================")
+print("=================")
 
-if True:
+if False:
     print("resnet_search_a:")
 
     resnet_model = Cube3ResnetModel()
@@ -107,6 +107,20 @@ if True:
 
     result = cpp_a_star.heuristic_search_a(
         pytorch_heuristic,
+        state, # state
+        1_000_000, # limit size
+        True # debug
+    )
+
+    print("Result actions: ", result.actions)
+    print("Result h_values: ", [np.round(h, 3) for h in result.h_values])
+    print("Result visit_nodes: ", result.visit_nodes)
+
+print("=================")
+
+if True:
+    print("catboost_parallel_search_a:")
+    result = cpp_a_star.catboost_parallel_search_a(
         state, # state
         1_000_000, # limit size
         True # debug
