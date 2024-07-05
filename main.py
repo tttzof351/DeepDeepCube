@@ -152,7 +152,88 @@ def test_catboost():
             records.append(rec)
             df = pd.DataFrame(records)
             df.to_pickle("./assets/reports/report_dataframe.pkl")
-                        
+
+def test_resnet():
+    game = Cube3Game("./assets/envs/cube_3_3_3_actions.pickle")
+
+    with open("./assets/tests/test_states.pickle", "rb") as f:
+        test_states = pkl.load(f)
+
+    with open("./assets/tests/test_distance.pickle", "rb") as f:
+        test_distances = pkl.load(f)
+
+    # print("test_states:", test_distances.shape)
+    # print("test_distances:", test_distances.shape)
+
+    model = Cube3ResnetModel()
+    model.load_state_dict(torch.load("./assets/models/Cube3ResnetModel.pt"))
+    
+    accelerator = Accelerator()
+    device = accelerator.device
+    model = accelerator.prepare(model)
+
+    class HWrap:
+        def __init__(self, model):
+            self.model = model
+            model.eval()
+        
+        def predict(self, state):
+            with torch.no_grad():
+                state = torch.tensor(np.array(state)).to(device)
+                output = self.model(state)
+                return output.detach().cpu().numpy()[:, 0]
+
+    h_wrap = HWrap(model)
+    
+    records = []
+    for i in range(len(test_distances)):
+        # if i != 400:
+        #     continue
+
+        target_distance = test_distances[i]
+        if target_distance > 0:
+            print(f"Distance i={i}):", target_distance)
+            start = time.time()
+            state = test_states[i]
+            a_star = AStar(
+                game=game,
+                heuristic=h_wrap,
+                root_state=state,
+                limit_size=100_000,
+                verbose=True
+            )
+
+            target_node = a_star.search(game)
+            visit_nodes = len(a_star.close)
+            end = time.time()
+            duration = np.round(end - start, 3)
+            
+            rec = {
+                "i": i,
+                "state": state,
+                "distance": target_distance,
+                "path": None,
+                "path_h": None,
+                "visit_nodes": visit_nodes,
+                "duration": duration
+            }
+            if target_node is not None:
+                solution_path = target_node.get_path()
+                rec["path"] = [n.action for n in solution_path]
+                rec["path_h"] = [np.round(n.h, 3) for n in solution_path]
+
+                print("Target node:", target_node.state)
+                print("visit_nodes:", visit_nodes)
+                print(f"g_min: {np.round(target_node.g, 3)}; h_min: {np.round(target_node.h, 3)}; f_min: {np.round(target_node.f, 3)}")              
+                print("Path actions:", [n.action for n in solution_path])
+                print("Path h:", [np.round(n.h, 3) for n in solution_path])
+            else:
+                print("Can't find!")
+            
+            records.append(rec)
+            df = pd.DataFrame(records)
+            df.to_pickle("./assets/reports/report_resnet_dataframe.pkl")
+
 def benchmank_a_star():
     with open("test_states.pickle", "rb") as f:
         test_states = pkl.load(f)
@@ -532,10 +613,12 @@ if __name__ == "__main__":
     parser.add_argument('--mode', type=str, default='test')
     args = parser.parse_args()
 
-    if args.mode == "test":
+    if args.mode == "test_catboost":
         test_catboost()
     elif args.mode == "train_catboost":
         train_catboost()
+    elif args.mode == "test_resnet":
+        test_resnet()
     elif args.mode == "benchmank_a_star":
         benchmank_a_star()
     elif args.mode == "benchmark_catboost":

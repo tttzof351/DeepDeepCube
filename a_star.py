@@ -79,9 +79,11 @@ class AStar:
         self.verbose = verbose
         self.heuristic = heuristic
         
+        h = heuristic.predict([root_state])[0]
+        # print("h:", h)
         root_node = Node(
             state=root_state, 
-            h=heuristic.predict(root_state)
+            h=h
         )
         root_node.reset_f()
         
@@ -98,6 +100,7 @@ class AStar:
 
             child_states = [game.apply_action(best_node.state, action) for action in range(len(game.actions))]
             child_hs = self.heuristic.predict(child_states)
+            # print("child_hs:", child_hs)
             
             for action in range(len(game.actions)):
                 child_state = child_states[action]
