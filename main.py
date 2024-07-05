@@ -168,9 +168,7 @@ def test_resnet():
     model = Cube3ResnetModel()
     model.load_state_dict(torch.load("./assets/models/Cube3ResnetModel.pt"))
     
-    model = torch.jit.script(model)
-    model = torch.jit.trace(model, torch.randint(low=0, high=54, size=(2, 54)))
-    # model = torch.compile(model)
+    model = model.to_torchscript()
     
     accelerator = Accelerator()
     device = accelerator.device

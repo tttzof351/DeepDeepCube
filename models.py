@@ -1,3 +1,4 @@
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
@@ -146,6 +147,13 @@ class Cube3ResnetModel(nn.Module):
         # output
         x = self.fc_out(x)
         return x
+    
+    def to_torchscript(self):
+        model = torch.jit.script(self)
+        model = torch.jit.trace(model, torch.randint(low=0, high=54, size=(2, 54)))
+        # model = torch.compile(model)
+        return model
+
     
 if __name__ == "__main__":
     model = Cube3ResnetModel()
