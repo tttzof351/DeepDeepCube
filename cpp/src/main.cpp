@@ -11,11 +11,11 @@
 #include <pybind11/numpy.h>
 #include <pybind11/stl.h>
 
-#include "../../assets/models/catboost_cube3.cpp"
-
 #include "utils.h"
 #include "cube3_game.h"
-#include "a_star.h"
+
+#include "heuristic_a_star.h"
+#include "catboost_a_star.h"
 
 using namespace std;
 namespace py = pybind11;
@@ -60,7 +60,12 @@ void init_envs(py::array_t<double> actions) {
     );    
 }
 
-ResultSearch search_a(py::array_t<double> state, int limit_size, bool debug) {
+ResultSearch heuristic_search_a(
+    py::function heuristic,
+    py::array_t<double> state, 
+    int limit_size, 
+    bool debug
+) {
     py::buffer_info state_info = state.request();
     ResultSearch result;
 
@@ -68,7 +73,8 @@ ResultSearch search_a(py::array_t<double> state, int limit_size, bool debug) {
         return result;
     }
     
-    AStar astar = AStar(
+    HeuristicAStar astar = HeuristicAStar(
+        heuristic,
         game,
         limit_size,
         (double*) state_info.ptr,
@@ -95,29 +101,45 @@ ResultSearch search_a(py::array_t<double> state, int limit_size, bool debug) {
     return result;   
 }
 
-void test_allocation_dealocation() {
-    cout << "Start alloc in C++" << endl;
-    double mock_state[54];
+ResultSearch catboost_search_a(
+    py::array_t<double> state, 
+    int limit_size, 
+    bool debug
+) {
+    py::buffer_info state_info = state.request();
+    ResultSearch result;
 
-    AStar astar = AStar(
-        game,
-        100'000'000,
-        mock_state,
-        true
-    );
-    for (int i = 0; i < 10'000'000; i++) {
-        astar.open.insert(
-            new Node(54)
-        );
-        astar.close.insert(
-            new Node(54)
-        );
-        if (i % 10000 == 0) {
-            cout << "i: " << i << endl;
-        }
+    if (game.is_goal((double*) state_info.ptr)) {
+        return result;
     }
-    cout << "End alloc in C++" << endl;
+    
+    CatboostAStar astar = CatboostAStar(        
+        game,
+        limit_size,
+        (double*) state_info.ptr,
+        debug
+    );
+
+    Node* target = astar.search(game);
+    result.visit_nodes = astar.close.size();
+
+    if (target == nullptr) {
+        return result;
+    } else if (debug) {
+        cout << "Found!" << endl;
+    }
+
+    vector<Node*> path = target->get_path();
+
+    for (int i = 0; i < path.size(); i++) {
+        Node* n = path[i];
+        result.actions.push_back(n->action);
+        result.h_values.push_back(n->h);
+    }
+
+    return result;   
 }
+
 
 PYBIND11_MODULE(cpp_a_star, m) { 
     m.doc() = "cpp_a_star module"; 
@@ -131,7 +153,9 @@ PYBIND11_MODULE(cpp_a_star, m) {
             .def_readwrite("h_values", &ResultSearch::h_values)
             .def_readwrite("visit_nodes", &ResultSearch::visit_nodes);
 
-    m.def("search_a", &search_a, "search_a"); 
+    m.def("heuristic_search_a", &heuristic_search_a, "heuristic_search_a"); 
+    m.def("catboost_search_a", &catboost_search_a, "catboost_search_a"); 
+
     
-    m.def("test_allocation_dealocation", &test_allocation_dealocation, "test_allocation_dealocation");
+    // m.def("test_allocation_dealocation", &test_allocation_dealocation, "test_allocation_dealocation");
 }

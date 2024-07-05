@@ -74,21 +74,75 @@ class Cube3ResnetModel(nn.Module):
         x = F.relu(x)
 
         # resnet blocks
-        for block_num in range(self.num_resnet_blocks):
-            res_inp = x
-            if self.batch_norm:
-                x = self.blocks[block_num][0](x)
-                x = self.blocks[block_num][1](x)
-                x = F.relu(x)
-                x = self.blocks[block_num][2](x)
-                x = self.blocks[block_num][3](x)
-            else:
-                x = self.blocks[block_num][0](x)
-                x = F.relu(x)
-                x = self.blocks[block_num][1](x)
+        # for block_num in range(self.num_resnet_blocks):
+        #     res_inp = x
+        #     if self.batch_norm:
+        #         x = self.blocks[block_num][0](x)
+        #         x = self.blocks[block_num][1](x)
+        #         x = F.relu(x)
+        #         x = self.blocks[block_num][2](x)
+        #         x = self.blocks[block_num][3](x)
+        #     else:
+        #         x = self.blocks[block_num][0](x)
+        #         x = F.relu(x)
+        #         x = self.blocks[block_num][1](x)
 
-            x = F.relu(x + res_inp)
+        #     x = F.relu(x + res_inp)
 
+        # ==================
+        res_inp = x
+        if self.batch_norm:
+            x = self.blocks[0][0](x)
+            x = self.blocks[0][1](x)
+            x = F.relu(x)
+            x = self.blocks[0][2](x)
+            x = self.blocks[0][3](x)
+        else:
+            x = self.blocks[0][0](x)
+            x = F.relu(x)
+            x = self.blocks[0][1](x)
+        x = F.relu(x + res_inp)
+
+        res_inp = x
+        if self.batch_norm:
+            x = self.blocks[1][0](x)
+            x = self.blocks[1][1](x)
+            x = F.relu(x)
+            x = self.blocks[1][2](x)
+            x = self.blocks[1][3](x)
+        else:
+            x = self.blocks[1][0](x)
+            x = F.relu(x)
+            x = self.blocks[1][1](x)
+        x = F.relu(x + res_inp)
+
+        res_inp = x
+        if self.batch_norm:
+            x = self.blocks[2][0](x)
+            x = self.blocks[2][1](x)
+            x = F.relu(x)
+            x = self.blocks[2][2](x)
+            x = self.blocks[2][3](x)
+        else:
+            x = self.blocks[2][0](x)
+            x = F.relu(x)
+            x = self.blocks[2][1](x)
+        x = F.relu(x + res_inp)        
+
+
+        res_inp = x
+        if self.batch_norm:
+            x = self.blocks[3][0](x)
+            x = self.blocks[3][1](x)
+            x = F.relu(x)
+            x = self.blocks[3][2](x)
+            x = self.blocks[3][3](x)
+        else:
+            x = self.blocks[3][0](x)
+            x = F.relu(x)
+            x = self.blocks[3][1](x)
+        x = F.relu(x + res_inp)        
+        # ==================
         # output
         x = self.fc_out(x)
         return x

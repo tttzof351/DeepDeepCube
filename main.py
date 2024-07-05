@@ -168,6 +168,10 @@ def test_resnet():
     model = Cube3ResnetModel()
     model.load_state_dict(torch.load("./assets/models/Cube3ResnetModel.pt"))
     
+    model = torch.jit.script(model)
+    model = torch.jit.trace(model, torch.randint(low=0, high=54, size=(2, 54)))
+    # model = torch.compile(model)
+    
     accelerator = Accelerator()
     device = accelerator.device
     model = accelerator.prepare(model)
@@ -186,7 +190,7 @@ def test_resnet():
     h_wrap = HWrap(model)
     
     records = []
-    for i in range(len(test_distances)):
+    for i in range(409, len(test_distances)):
         # if i != 400:
         #     continue
 
@@ -232,7 +236,7 @@ def test_resnet():
             
             records.append(rec)
             df = pd.DataFrame(records)
-            df.to_pickle("./assets/reports/report_resnet_dataframe.pkl")
+            # df.to_pickle("./assets/reports/report_resnet_dataframe.pkl")
 
 def benchmank_a_star():
     with open("test_states.pickle", "rb") as f:

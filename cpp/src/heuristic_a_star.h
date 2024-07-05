@@ -1,119 +1,33 @@
-#ifndef A_STAR_H
-#define A_STAR_H
+#ifndef HEURISTIC_A_STAR_H
+#define HEURISTIC_A_STAR_H
+
+#include <omp.h>
+#include <pybind11/pybind11.h>
+#include <pybind11/numpy.h>
+#include <vector>
+
+namespace py = pybind11;
 
 #include "utils.h"
+#include "nodes.h"
 #include "cube3_game.h"
 
-class Node {
-    public:
-
-    int space_size = -1;
-    vector<float>* state = nullptr; //TODO: Move to stack
-    uint64_t state_hash = -1;
-
-    float g = 0;
-    float h = 0;
-    float f = 0;
-
-    Node* parent = nullptr;
-    int action = -1;
-
-    Node(
-        int space_size
-    ) {
-        this->space_size = space_size;
-        this->state = new vector<float>(space_size);
-    }
-
-    ~Node() {
-        if (this->state != nullptr) {
-            delete this->state;
-            this->state = nullptr;
-        }
-    }
-
-    void reset_hash() {
-        this->state_hash = w_hash(
-            (void*)&this->state->at(0), 
-            this->space_size * sizeof(float)
-        );
-    }
-
-    void reset_f() {
-        this->f = this->h + this->g;
-    }
-
-    vector<Node*> get_path() {
-        Node* node = this;
-        vector<Node*> path;
-
-        while (node != nullptr) {
-            path.push_back(node); // TODO: push_front ? 
-            node = node->parent;
-        }
-        std::reverse(path.begin(), path.end());
-
-        return move(path);
-    }
-};
-
-struct CompareNode {
-    bool operator()(const Node* n1, const Node* n2) {
-        return n1->f > n2->f;
-    }
-};
-
-class NodeQueue {
-    public:
-
-    std::priority_queue <Node*, vector<Node*>, CompareNode> queue;
-    std::map<uint64_t, Node*> hashes;
-
-    NodeQueue() {
-        ;
-    }
-
-    ~NodeQueue() {
-        ;
-    }
-
-    void insert(Node* node) {
-        this->queue.push(node);
-        this->hashes[node->state_hash] = node;
-    }
-
-    Node* pop_min_element() {
-        Node* node = this->queue.top();
-        this->queue.pop();
-
-        this->hashes.erase(node->state_hash);
-
-        return node;
-    }
-
-    int size() {
-        return this->queue.size();
-    }
-
-    bool is_contains(Node* node) {
-        return this->hashes.find(node->state_hash) != this->hashes.end();
-    }
-};
-
-class AStar {
+class HeuristicAStar {
     public:
     
+    py::function& heuristic;
     int limit_size = -1;
     bool debug = false;    
     NodeQueue open;
     NodeQueue close;
 
-    AStar(
+    HeuristicAStar(
+        py::function& heuristic,
         Cube3Game& game,
         int limit_size,
         double* init_state_raw,
         bool debug
-    ) {
+    ): heuristic(heuristic) {
         this->limit_size = limit_size;
         this->debug = debug;
 
@@ -124,14 +38,17 @@ class AStar {
             root_node->state->at(i) = int(init_state_raw[i]);
         }
         
-        root_node->h = ApplyCatboostModel(*root_node->state);
+        py::object result = heuristic(*root_node->state);
+        vector<float> hs = result.cast<vector<float>>();
+        root_node->h = hs[0];
+
         root_node->reset_hash();
         root_node->reset_f();
 
         this->open.insert(root_node);
     }
 
-    ~AStar() {
+    ~HeuristicAStar() {
         for (auto it = open.hashes.begin(); it != open.hashes.end(); it++) {
             delete it->second;
         }
@@ -147,6 +64,8 @@ class AStar {
         }
         
         Node* child_nodes[game.action_size];
+        std::vector<float> all_child_states(game.action_size * game.space_size);
+
         int global_i = 0;
 
         auto start = std::chrono::high_resolution_clock::now();
@@ -166,14 +85,27 @@ class AStar {
                     action
                 );
 
-                child->h = ApplyCatboostModel(*(child->state));
-                child->g = best_node->g + 1;
+                std::memcpy(
+                    &all_child_states[action * game.space_size], //dst
+                    &child->state->at(0), //src
+                    game.space_size * sizeof(float)
+                );                
 
-                child->parent = best_node;                
                 child->reset_hash();
-                child->reset_f();
 
+                child->g = best_node->g + 1;
+                child->parent = best_node;                
                 child_nodes[action] = child;
+            }
+            
+            py::object result = heuristic(all_child_states);
+            vector<float> hs = result.cast<vector<float>>();
+            
+            #pragma omp parallel for
+            for (int action = 0; action < game.action_size; action++) {
+                Node* child = child_nodes[action];
+                child->h = hs[action];
+                child->reset_f();
             }
 
             for (int action = 0; action < game.action_size; action++) {

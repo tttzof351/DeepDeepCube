@@ -10,7 +10,11 @@ class Cube3Game:
         self.initial_state = np.arange(0, 54)
         self.hash_inital_state = hash(str(self.initial_state))
 
-    def apply_action(self, state, action):
+        self.action_size = self.actions.shape[0]
+        self.space_size = self.actions.shape[1]
+
+
+    def apply_action(self, state, action):        
         return state[self.actions[action]]        
 
     def get_random_states(
