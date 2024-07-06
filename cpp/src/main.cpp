@@ -180,6 +180,48 @@ ResultSearch catboost_parallel_search_a(
     return result;   
 }
 
+void check_hashes() {
+    std::vector<float> v1(54);
+    std::vector<float> v2(54);
+
+    for (int i = 0; i < 54; i++) {
+        v1[i] = float(int(i));
+    }
+
+    for (int i = 0; i < 54; i++) {
+        v2[i] = i;
+    }
+
+    for (int i = 0; i < 54; i++) {
+        v2[i] = float(v2[i]);
+    }
+
+    std::cout << "v1: ";
+    for (int i = 0; i < 54; i++) {
+        std::cout << v1[i] << ", ";
+    }
+    std::cout << std::endl;
+
+    std::cout << "v2: ";
+    for (int i = 0; i < 54; i++) {
+        std::cout << v2[i] << ", ";
+    }
+    std::cout << std::endl;    
+
+    uint64_t hash_v1 = w_hash(
+        (void*)&v1[0], 
+        54 * sizeof(float)
+    );
+
+    uint64_t hash_v2 = w_hash(
+        (void*)&v2[0], 
+        54 * sizeof(float)
+    );    
+
+    std::cout << "v1 hash:" << hash_v1 << std::endl;
+    std::cout << "v2 hash:" << hash_v2 << std::endl;
+}
+
 
 PYBIND11_MODULE(cpp_a_star, m) { 
     m.doc() = "cpp_a_star module"; 
@@ -196,6 +238,7 @@ PYBIND11_MODULE(cpp_a_star, m) {
     m.def("heuristic_search_a", &heuristic_search_a, "heuristic_search_a"); 
     m.def("catboost_search_a", &catboost_search_a, "catboost_search_a"); 
     m.def("catboost_parallel_search_a", &catboost_parallel_search_a, "catboost_parallel_search_a"); 
+    m.def("check_hashes", &check_hashes, "check_hashes");
 
     
     // m.def("test_allocation_dealocation", &test_allocation_dealocation, "test_allocation_dealocation");

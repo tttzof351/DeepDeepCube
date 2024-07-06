@@ -4,8 +4,11 @@
 #include <vector>
 #include <queue>
 #include <map>
+#include <set>
 
 #include "utils.h"
+#include "bloom_filter.hpp"
+#include "MinMaxHeap.hpp"
 
 using namespace std;
 
@@ -68,6 +71,19 @@ struct CompareNode {
     }
 };
 
+struct CompareNode2 {
+    bool operator()(Node* n1, const Node* n2) const {
+        return n1->f > n2->f;
+    }
+};
+
+struct CompareNode3 {
+    bool operator()(Node* n1, const Node* n2) const {
+        return n1->f < n2->f;
+    }
+};
+
+
 class NodeQueue {
     public:
 
@@ -103,6 +119,149 @@ class NodeQueue {
     bool is_contains(Node* node) {
         return this->hashes.find(node->state_hash) != this->hashes.end();
     }
+};
+
+class NodeSet {
+    public:
+
+    std::set<Node*, CompareNode2> queue;
+    std::map<uint64_t, Node*> hashes;
+
+    NodeSet() {
+        ;
+    }
+
+    ~NodeSet() {
+        ;
+    }
+
+    void insert(Node* node) {
+        this->queue.insert(node);
+        this->hashes[node->state_hash] = node;
+    }
+
+    Node* pop_min_element() {
+        Node* node = *this->queue.rbegin();
+        queue.erase(node);
+
+        this->hashes.erase(node->state_hash);
+
+        return (Node*)node;
+    }
+
+    int size() {
+        return this->queue.size();
+    }
+
+    bool is_contains(Node* node) {
+        return this->hashes.find(node->state_hash) != this->hashes.end();
+    }
+};
+
+class NodeMinMax {
+    public:
+
+    minmax::MinMaxHeap<Node*, std::vector<Node*>, CompareNode3> heap;
+    std::map<uint64_t, Node*> hashes;
+
+    NodeMinMax() {
+    }
+
+    ~NodeMinMax() {
+    }
+
+    void insert(Node* node) {
+        this->heap.push(node);
+        this->hashes[node->state_hash] = node;
+
+    }
+
+    Node* pop_min_element() {
+        Node* node = heap.popMin();
+        this->hashes.erase(node->state_hash);
+
+        return (Node*)node;
+    }
+
+    int size() {
+        return this->heap.size();
+    }
+
+    bool is_contains(Node* node) {
+        return this->hashes.find(node->state_hash) != this->hashes.end();
+    }
+
+    Node* pop_max_element() {
+        Node* node = heap.popMax();
+        this->hashes.erase(node->state_hash);
+
+        return node;
+    }
+};
+
+class NodeMinMaxBloom {
+    public:
+
+    bloom_parameters parameters;
+    minmax::MinMaxHeap<Node*, std::vector<Node*>, CompareNode3> heap;
+    std::map<uint64_t, Node*> hashes;
+    bloom_filter* filter = nullptr;
+
+    NodeMinMaxBloom() {
+        parameters.projected_element_count = 1000000;
+        parameters.false_positive_probability = 0.1;
+        parameters.random_seed = 0xA5A5A5A5;
+        parameters.compute_optimal_parameters();
+        
+        filter = new bloom_filter(parameters);
+    }
+
+    ~NodeMinMaxBloom() {
+        delete filter;
+    }
+
+    void insert(Node* node) {
+        this->heap.push(node);
+        this->hashes[node->state_hash] = node;
+        this->filter->insert(node->state_hash);   
+    }
+
+    Node* pop_min_element() {
+        Node* node = heap.popMin();
+        this->hashes.erase(node->state_hash);
+
+        return (Node*)node;
+    }
+
+    int size() {
+        return this->heap.size();
+    }
+
+    bool is_contains(Node* node) {
+        return false;
+        bool is_contains_in_bloom = this->filter->contains(node->state_hash);
+        if (~is_contains_in_bloom) {
+            return false;
+        }
+
+        return this->hashes.find(node->state_hash) != this->hashes.end();
+    }
+
+    Node* pop_max_element() {
+        Node* node = heap.popMax();
+        this->hashes.erase(node->state_hash);
+
+        return node;
+    }
+
+    void reset_bloom() {
+        delete filter;
+        filter = new bloom_filter(parameters);
+
+        for (auto it = hashes.begin(); it != hashes.end(); it++) {
+            filter->insert(it->second->state_hash);
+        }
+    } 
 };
 
 #endif
