@@ -189,11 +189,11 @@ void check_hashes() {
     }
 
     for (int i = 0; i < 54; i++) {
-        v2[i] = i;
+        v2[i] = float(i) + 0.1;
     }
 
     for (int i = 0; i < 54; i++) {
-        v2[i] = float(v2[i]);
+        v2[i] = int(v2[i]);
     }
 
     std::cout << "v1: ";

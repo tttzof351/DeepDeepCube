@@ -23,6 +23,8 @@ class Node {
     float h = 0;
     float f = 0;
 
+    float alpha = 1.0;
+
     Node* parent = nullptr;
     int action = -1;
 
@@ -33,11 +35,23 @@ class Node {
         this->state = new vector<float>(space_size);
     }
 
+    Node(
+        int space_size,
+        float alpha
+    ) : Node (space_size) {
+        this->alpha = alpha;
+    }    
+
     ~Node() {
         if (this->state != nullptr) {
             delete this->state;
             this->state = nullptr;
         }
+    }
+
+    void clear_state() {
+        delete this->state;
+        this->state = nullptr;
     }
 
     void reset_hash() {
@@ -48,7 +62,7 @@ class Node {
     }
 
     void reset_f() {
-        this->f = this->h + this->g;
+        f = alpha * g + h;
     }
 
     vector<Node*> get_path() {
@@ -238,11 +252,10 @@ class NodeMinMaxBloom {
     }
 
     bool is_contains(Node* node) {
-        return false;
-        bool is_contains_in_bloom = this->filter->contains(node->state_hash);
-        if (~is_contains_in_bloom) {
-            return false;
-        }
+        // bool is_contains_in_bloom = this->filter->contains(node->state_hash);
+        // if (~is_contains_in_bloom) {
+        //     return false;
+        // }
 
         return this->hashes.find(node->state_hash) != this->hashes.end();
     }

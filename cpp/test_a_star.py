@@ -34,19 +34,18 @@ game = Cube3Game("../assets/envs/cube_3_3_3_actions.pickle")
 cpp_a_star.init_envs(game.actions)
 cpp_a_star.run_openmp_test()
 
-# print("Start alloc test")
-# cpp_a_star.test_allocation_dealocation()
-# print("End alloc test")
-
-catboost_model = CatBoostRegressor()
-catboost_model.load_model("../assets/models/catboost_cube3.cb")
-
+if False:
+    cpp_a_star.check_hashes()
 
 # t = 400
-t = 931
+# t = 931
+t = 622
 state = test_states[t]
 
 if False:
+    catboost_model = CatBoostRegressor()
+    catboost_model.load_model("../assets/models/catboost_cube3.cb")
+
     def catboost_heuristic(state):
         state = np.array(state).reshape(-1, game.space_size)
         out = catboost_model.predict(state)
@@ -129,3 +128,4 @@ if True:
     print("Result actions: ", result.actions)
     print("Result h_values: ", [np.round(h, 3) for h in result.h_values])
     print("Result visit_nodes: ", result.visit_nodes)
+

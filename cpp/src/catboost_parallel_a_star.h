@@ -17,14 +17,20 @@ class CatboostParallelAStar {
     public:
 
     int limit_size = -1;
-    int parallel_size = 100;
+    int parallel_size = 10;
 
-    int open_max_size = 1000'000;
+    int open_max_size = 100'000;
     int open_optimum_size = 100'000;
 
-    bool debug = true;    
+    bool debug = true;
+
+    float alpha = 0.9;
+
     NodeMinMaxBloom open;
     NodeMinMaxBloom close;
+
+    // NodeQueue open;
+    // NodeQueue close;
 
     CatboostParallelAStar(
         Cube3Game& game,
@@ -35,7 +41,7 @@ class CatboostParallelAStar {
         this->limit_size = limit_size;
         this->debug = debug;
 
-        Node* root_node = new Node(game.space_size);
+        Node* root_node = new Node(game.space_size, alpha);
         
         for (int i = 0; i < game.space_size; i++) {
             root_node->state->at(i) = int(init_state_raw[i]);
@@ -95,7 +101,7 @@ class CatboostParallelAStar {
                 //Initialization childs
                 #pragma omp parallel for
                 for (int action = 0; action < game.action_size; action++) {
-                    Node* child = new Node(game.space_size);
+                    Node* child = new Node(game.space_size, alpha);
                     child->action = action;
 
                     game.apply_action(
@@ -137,7 +143,7 @@ class CatboostParallelAStar {
 
                         continue;
                     } else {
-                        //this->open.insert(child);
+                        // this->open.insert(child);
                         candidates_to_open[i].push_back(child);
                     }
                 }
@@ -153,13 +159,19 @@ class CatboostParallelAStar {
             for (int i = 0; i < best_parallel_q.size(); i++) {
                 std::vector<Node*>& append_to_opens = candidates_to_open[i];
                 for (int j = 0; j < append_to_opens.size(); j++) {
-                    open.insert(append_to_opens[j]);
+                    Node* node = append_to_opens[j];
+                    if (open.is_contains(node)) {
+                        delete node;
+                    } else {
+                        open.insert(append_to_opens[j]);
+                    }
                 }
             }
 
             for (int i = 0; i < best_parallel_q.size(); i++) {
                 Node* best_node = best_parallel_q[i];
                 close.insert(best_node);
+                best_node->clear_state();
             }
             delete[] candidates_to_open;
 
@@ -190,8 +202,7 @@ class CatboostParallelAStar {
                     Node* node = open.pop_max_element();
                     delete node;
                 }
-
-                open.reset_bloom();
+                // open.reset_bloom();
             }
         }
 
