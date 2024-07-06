@@ -702,6 +702,12 @@ if __name__ == "__main__":
             path_test_distance = "./assets/tests/test_distance.pickle",
             output_path = "./assets/reports/cpp_parallel_reports.pkl"
         )
+    elif args.mode == "test_catboost_parallel_1000_cpp":
+        test_catboost_parallel_cpp(
+            path_test_states = "./assets/tests/test_states_1000.pickle",
+            path_test_distance = "./assets/tests/test_distance_1000.pickle",
+            output_path = "./assets/reports/cpp_parallel_reports_1000.pkl"
+        )
     elif args.mode == "gen_test_1000":
         generate_test_1000()
     elif args.mode == "metropolis_a_star_1000":
