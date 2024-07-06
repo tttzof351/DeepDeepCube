@@ -17,14 +17,14 @@ class CatboostParallelAStar {
     public:
 
     int limit_size = -1;
+    
     int parallel_size = 10;
-
-    int open_max_size = 100'000;
-    int open_optimum_size = 100'000;
+    int open_max_size = 10000;
+    float alpha = 0.9;
+    // int open_optimum_size = 10000;
 
     bool debug = true;
 
-    float alpha = 0.9;
 
     NodeMinMaxBloom open;
     NodeMinMaxBloom close;
@@ -36,12 +36,19 @@ class CatboostParallelAStar {
         Cube3Game& game,
         int limit_size,
         double* init_state_raw,
-        bool debug
+        bool debug,
+        int parallel_size = 10,
+        int open_max_size = 10000,
+        float alpha = 0.9
     ) {
         this->limit_size = limit_size;
         this->debug = debug;
+        
+        this->parallel_size = parallel_size;
+        this->open_max_size = open_max_size;
+        this->alpha = alpha;
 
-        Node* root_node = new Node(game.space_size, alpha);
+        Node* root_node = new Node(game.space_size, this->alpha);
         
         for (int i = 0; i < game.space_size; i++) {
             root_node->state->at(i) = int(init_state_raw[i]);
@@ -101,7 +108,7 @@ class CatboostParallelAStar {
                 //Initialization childs
                 #pragma omp parallel for
                 for (int action = 0; action < game.action_size; action++) {
-                    Node* child = new Node(game.space_size, alpha);
+                    Node* child = new Node(game.space_size, this->alpha);
                     child->action = action;
 
                     game.apply_action(
@@ -197,13 +204,17 @@ class CatboostParallelAStar {
                 prev_global_i = global_i;
             }
 
-            if (open.size() > open_max_size) {
-                while (open.size() > open_optimum_size) {
+            if (open.size() > this->open_max_size) {
+                while (open.size() > open_max_size) {
                     Node* node = open.pop_max_element();
                     delete node;
                 }
                 // open.reset_bloom();
             }
+
+            if (global_i > this->limit_size) {
+                return nullptr;
+            }            
         }
 
         return nullptr;

@@ -38,8 +38,8 @@ if False:
     cpp_a_star.check_hashes()
 
 # t = 400
-# t = 931
-t = 622
+t = 931
+# t = 622
 state = test_states[t]
 
 if False:
@@ -118,14 +118,18 @@ if False:
 print("=================")
 
 if True:
+    state = test_states[t]
+
     print("catboost_parallel_search_a:")
     result = cpp_a_star.catboost_parallel_search_a(
         state, # state
-        1_000_000, # limit size
-        True # debug
+        10_000_000, # limit size
+        True, # debug,
+        10, # parallel_size,
+        10000, # open_max_size
+        0.9 # alpha
     )
 
     print("Result actions: ", result.actions)
     print("Result h_values: ", [np.round(h, 3) for h in result.h_values])
     print("Result visit_nodes: ", result.visit_nodes)
-

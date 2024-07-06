@@ -144,7 +144,10 @@ ResultSearch catboost_search_a(
 ResultSearch catboost_parallel_search_a(
     py::array_t<double> state, 
     int limit_size, 
-    bool debug
+    bool debug,
+    int parallel_size,
+    int open_max_size,
+    float alpha
 ) {
     py::buffer_info state_info = state.request();
     ResultSearch result;
@@ -157,7 +160,10 @@ ResultSearch catboost_parallel_search_a(
         game,
         limit_size,
         (double*) state_info.ptr,
-        debug
+        debug,
+        parallel_size,
+        open_max_size,
+        alpha
     );
 
     Node* target = astar.search(game);

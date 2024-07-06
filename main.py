@@ -310,7 +310,7 @@ def test_cube_env():
 
     pass
 
-def test_cpp(
+def test_catboost_cpp(
         path_test_states: str,
         path_test_distance: str,
         output_path: str
@@ -340,10 +340,67 @@ def test_cpp(
         target_distance = test_distance[i]
         
         print("Distance: ", target_distance)
-        result = cpp_a_star.search_a(
+        result = cpp_a_star.catboost_search_a(
             state, # state
             10_000_000, # limit size
             True # debug
+        )
+
+        end = time.time()
+        duration = np.round(end - start, 3)
+
+        rec = {
+            "i": i,
+            "state": state,
+            "target_distance": target_distance,
+            "solution": result.actions,
+            "h_values": [np.round(h, 3) for h in result.h_values],
+            "visit_nodes": result.visit_nodes,
+            "duration_sec": duration
+        }
+        print(rec)
+        records.append(rec)
+
+        df = pd.DataFrame(records)
+        df.to_pickle(output_path)
+
+def test_catboost_parallel_cpp(
+        path_test_states: str,
+        path_test_distance: str,
+        output_path: str
+):
+    import os
+    import sys
+    sys.path.append("./assets/shared_libraries/macos")
+
+    import cpp_a_star
+
+    with open("./assets/envs/cube_3_3_3_actions.pickle", "rb") as f:
+        actions = np.array(pkl.load(f))
+
+    with open(path_test_states, "rb") as f:
+        test_states = pkl.load(f)
+        
+    with open(path_test_distance, "rb") as f:
+        test_distance = pkl.load(f)
+
+    cpp_a_star.init_envs(actions)
+
+    records = []
+    for i in range(0, len(test_distance)):
+        start = time.time()
+
+        state = test_states[i]
+        target_distance = test_distance[i]
+        
+        print("Distance: ", target_distance)
+        result = cpp_a_star.catboost_parallel_search_a(
+            state, # state
+            10_000_000, # limit size
+            True, # debug,
+            10, # parallel_size,
+            10000, # open_max_size
+            0.9 # alpha
         )
 
         end = time.time()
@@ -464,7 +521,7 @@ def metropolis_a_star_cpp(
                 current_state = game.apply_action(state=current_state, action=a)
 
             print("Distance: ", target_distance, "; Metropolis: ", metropolis_counter)
-            result = cpp_a_star.search_a(
+            result = cpp_a_star.catboost_search_a(
                 current_state, # state
                 10_000_000, # limit size
                 True # debug
@@ -476,7 +533,7 @@ def metropolis_a_star_cpp(
                 solution = []
 
         else:
-            result = cpp_a_star.search_a(
+            result = cpp_a_star.catboost_search_a(
                 state, # state
                 10_000_000, # limit size
                 True # debug
@@ -627,17 +684,23 @@ if __name__ == "__main__":
         benchmark_catboost()
     elif args.mode == "test_cube_env":
         test_cube_env()
-    elif args.mode == "test_cpp":
-        test_cpp(
+    elif args.mode == "test_catboost_cpp":
+        test_catboost_cpp(
             path_test_states = "./assets/tests/test_states.pickle",
             path_test_distance = "./assets/tests/test_distance.pickle",
             output_path = "./assets/reports/cpp_reports.pkl"
         )
-    elif args.mode == "test_1000_cpp":
-        test_cpp(
+    elif args.mode == "test_catboost_1000_cpp":
+        test_catboost_cpp(
             path_test_states = "./assets/tests/test_states_1000.pickle",
             path_test_distance = "./assets/tests/test_distance_1000.pickle",
             output_path = "./assets/reports/cpp_reports_1000.pkl"
+        )
+    elif args.mode == "test_catboost_parallel_cpp":
+        test_catboost_parallel_cpp(
+            path_test_states = "./assets/tests/test_states.pickle",
+            path_test_distance = "./assets/tests/test_distance.pickle",
+            output_path = "./assets/reports/cpp_parallel_reports.pkl"
         )
     elif args.mode == "gen_test_1000":
         generate_test_1000()
